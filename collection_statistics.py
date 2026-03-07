@@ -8,7 +8,7 @@ import math
 collection = ir_datasets.load("msmarco-passage/train")
 
 use_collection_subset = True
-subset_collection_size = 10000 # 5000000
+subset_collection_size = 10 # 5000000
 
 collection_doc_count = subset_collection_size if use_collection_subset else collection.docs_count()
 collection_word_count = 0

@@ -2,11 +2,8 @@ from typing import Callable
 from collections import defaultdict
 import string
 import spacy
-import nltk
-nltk.download("wordnet")
-nltk.download("omw-1.4")
-from nltk.corpus import wordnet as wn
 from models import tokenizer
+from sentence_transformers import SentenceTransformer, util
 import collection_statistics
 import math
 
@@ -17,6 +14,7 @@ class TaggedToken:
 
     categorical_tags: dict[str, str]
     numeric_tags: dict[str, float]
+    other_tags: dict
 
     def __init__(self, index: int, id: int, start: int, end: int, text: str):
         self.index = index
@@ -27,6 +25,7 @@ class TaggedToken:
 
         self.categorical_tags = defaultdict(lambda: "")
         self.numeric_tags = defaultdict(lambda: 0)
+        self.other_tags = {}
 
     def __str__(self):
         categorical_tags_str = ", ".join(f"{k}=\"{v}\"" for k, v in self.categorical_tags.items())
@@ -41,7 +40,7 @@ def tokenize(text: str, start_index: int):
     
     return [ TaggedToken(index + start_index, id, start, end, text[start : end]) for index, (id, (start, end)) in enumerate(zip(tokens["input_ids"], tokens["offset_mapping"])) ]
 
-pos_tagger = spacy.load("en_core_web_sm", disable=["parser", "ner", "lemmatizer"])
+pos_tagger = spacy.load("en_core_web_lg", disable=["parser", "ner", "lemmatizer"])
 
 def tag_pos(tagged_tokens: list[TaggedToken], text: str):
     word_list = pos_tagger(text)
@@ -58,6 +57,15 @@ def tag_pos(tagged_tokens: list[TaggedToken], text: str):
                 tagged_token.categorical_tags["pos"] = word.pos_
                 tagged_token.categorical_tags["word"] = word.text
                 tagged_token.numeric_tags["word_index"] = word_index
+
+similarity_model = SentenceTransformer("all-MiniLM-L6-v2")
+
+# call after tagging pos to extract word
+def tag_embedding(tagged_tokens: list[TaggedToken], text: str):
+    embeddings = similarity_model.encode([ tagged_token.categorical_tags["word"].lower().strip() for tagged_token in tagged_tokens ])
+
+    for embedding_index in range(embeddings.shape[0]):
+        tagged_tokens[embedding_index].other_tags["embedding"] = embeddings[embedding_index, :]
 
 # call after tagging pos to extract word
 def tag_collection_stats(tagged_tokens: list[TaggedToken], text: str):
@@ -174,48 +182,25 @@ def are_exact_token_match(first_tagged_token: TaggedToken, second_tagged_token: 
     return first_tagged_token.id == second_tagged_token.id
 
 def are_exact_word_match(first_tagged_token: TaggedToken, second_tagged_token: TaggedToken):
-    return first_tagged_token.categorical_tags["word"] == second_tagged_token.categorical_tags["word"]
+    return first_tagged_token.categorical_tags["word"].lower().strip() == second_tagged_token.categorical_tags["word"].lower().strip()
 
 def are_synonyms(first_tagged_token: TaggedToken, second_tagged_token: TaggedToken):
-    first_word = first_tagged_token.categorical_tags["word"].lower().strip()
-    second_word = second_tagged_token.categorical_tags["word"].lower().strip()
-    
-    for syn in wn.synsets(first_word):
-        lemmas = { lemma.name() for lemma in syn.lemmas() }
-        
-        for lemma in syn.lemmas():
-            lemmas.update(related.name() for related in lemma.derivationally_related_forms())
-        
-        for related_syn in syn.hypernyms() + syn.hyponyms():
-            lemmas.update(lemma.name() for lemma in related_syn.lemmas())
-        
-        if second_word in lemmas:
-            return True
-        
-    for syn in wn.synsets(second_word):
-        lemmas = { lemma.name() for lemma in syn.lemmas() }
-        
-        for lemma in syn.lemmas():
-            lemmas.update(related.name() for related in lemma.derivationally_related_forms())
-        
-        for related_syn in syn.hypernyms() + syn.hyponyms():
-            lemmas.update(lemma.name() for lemma in related_syn.lemmas())
-        
-        if first_word in lemmas:
-            return True
-    
-    return False
+    return util.cos_sim(
+        first_tagged_token.other_tags["embedding"],
+        second_tagged_token.other_tags["embedding"]
+    ).item() > 0.7
 
-# def are_synonyms(first_tagged_token: TaggedToken, second_tagged_token: TaggedToken):
-#     for synonym in wn.synsets(first_tagged_token.categorical_tags["word"]):
-#         if second_tagged_token.categorical_tags["word"] in { lemma.name() for lemma in synonym.lemmas() }:
-#             return True
-        
-#     for synonym in wn.synsets(second_tagged_token.categorical_tags["word"]):
-#         if first_tagged_token.categorical_tags["word"] in { lemma.name() for lemma in synonym.lemmas() }:
-#             return True
-    
-#     return False
+def are_related(first_tagged_token: TaggedToken, second_tagged_token: TaggedToken):
+    return util.cos_sim(
+        first_tagged_token.other_tags["embedding"],
+        second_tagged_token.other_tags["embedding"]
+    ).item() > 0.3
+
+def are_topical(first_tagged_token: TaggedToken, second_tagged_token: TaggedToken):
+    return util.cos_sim(
+        first_tagged_token.other_tags["embedding"],
+        second_tagged_token.other_tags["embedding"]
+    ).item() > 0.1
 
 def are_mirror(first_tagged_token: TaggedToken, second_tagged_token: TaggedToken):
     return first_tagged_token.index == second_tagged_token.index
@@ -256,13 +241,14 @@ def filter_combination(predicate: Callable[[TaggedToken, TaggedToken], bool]):
     
     return filter_combination_with_predicate
 
-def filter_tagged_token_pairs(tagged_tokens: list[TaggedToken], pair_filters: list[Callable[[list[TaggedToken], list[tuple[int, int]]], list[tuple[int, int]]]]):
+def filter_tagged_token_pairs(tagged_tokens: list[TaggedToken], pair_filters: list[Callable[[list[TaggedToken], list[tuple[int, int]]], set[tuple[int, int]]]]):
     pairs = []
 
     for i in range(len(tagged_tokens)):
         for j in range(len(tagged_tokens)):
             pairs.append((i, j))
 
-    for pair_filter in pair_filters: pairs = pair_filter(tagged_tokens, pairs)
+    for pair_filter in pair_filters:
+        pairs = pair_filter(tagged_tokens, pairs)
 
-    return pairs
+    return set(pairs)
