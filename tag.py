@@ -209,7 +209,10 @@ def are_adjacent(first_tagged_token: TaggedToken, second_tagged_token: TaggedTok
     return abs(first_tagged_token.index - second_tagged_token.index) == 1
 
 def are_neighbors(first_tagged_token: TaggedToken, second_tagged_token: TaggedToken):
-    return abs(first_tagged_token.numeric_tags["word_index"] - second_tagged_token.numeric_tags["word_index"]) <= 2
+    return (
+        abs(first_tagged_token.numeric_tags["word_index"] - second_tagged_token.numeric_tags["word_index"]) <= 2 and
+        first_tagged_token.categorical_tags["type"] == second_tagged_token.categorical_tags["type"]
+    )
 
 def are_same_word_group(first_tagged_token: TaggedToken, second_tagged_token: TaggedToken):
     return (

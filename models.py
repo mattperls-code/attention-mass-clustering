@@ -19,7 +19,7 @@ model.to(device)
 model.eval()
 
 def get_attention_layers(query: str, document: str):
-    tokens = tokenizer(query, document, return_tensors="pt")
+    tokens = tokenizer(query, document, return_tensors="pt").to(device)
 
     with torch.no_grad():
         outputs = model(**tokens, output_attentions=True)

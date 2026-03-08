@@ -7,8 +7,8 @@ import tag
 from heatmap import attention_heatmap, transformer_heatmap
 import attention_features
 
-num_rel_pairs = 2500
-num_nrel_pairs = 500
+num_rel_pairs = 100
+num_nrel_pairs = 100
 
 def plot_feature_attention_mass():
     features = [
@@ -168,7 +168,7 @@ def example_heatmap():
     attention_heatmap("results/attention-heatmaps/2.png", f"{composite_feature2} (Layer 1, Head 22)", all_tagged_tokens, attention_layers[1][0, 22, :, :], composite_feature_pairs[composite_feature2])
 
     composite_feature3 = "Rare Tokens Attending Rare Word Identical Tokens"
-    attention_heatmap("results/attention-heatmaps/3.png", f"{composite_feature3} (Layer 1, Head 18)", all_tagged_tokens, attention_layers[1][0, 18, :, :], composite_feature_pairs[composite_feature3])
+    attention_heatmap("results/attention-heatmaps/3.png", f"{composite_feature3} (Layer 8, Head 25)", all_tagged_tokens, attention_layers[8][0, 25, :, :], composite_feature_pairs[composite_feature3])
 
     composite_feature4 = "Very Rare Document Tokens Attending Query Tokens"
     attention_heatmap("results/attention-heatmaps/4.png", f"{composite_feature4} (Layer 16, Head 17)", all_tagged_tokens, attention_layers[16][0, 17, :, :], composite_feature_pairs[composite_feature4])
