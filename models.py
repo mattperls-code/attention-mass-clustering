@@ -12,10 +12,16 @@ base_model = AutoModelForSequenceClassification.from_pretrained(base_model_name,
 model = PeftModel.from_pretrained(base_model, model_name)
 model = model.merge_and_unload()
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(f"Using Device: {device}")
+
+model.to(device)
+model.eval()
+
 def get_attention_layers(query: str, document: str):
     tokens = tokenizer(query, document, return_tensors="pt")
 
     with torch.no_grad():
         outputs = model(**tokens, output_attentions=True)
 
-        return outputs.attentions
+        return [ attention_layer.detach().cpu() for attention_layer in outputs.attentions ]

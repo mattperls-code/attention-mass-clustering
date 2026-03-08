@@ -1,11 +1,12 @@
 import os
 import torch
+import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import tag
-from models import get_attention_layers
+import attention_features
 
-def heatmap(output_file: str, tagged_tokens: list[tag.TaggedToken], attention_matrix: torch.Tensor, pairs: set[tuple[int, int]]):
+def heatmap(output_file: str, title: str, tagged_tokens: list[tag.TaggedToken], attention_matrix: torch.Tensor, pairs: set[tuple[int, int]]):
     scores = {}
 
     for i in range(attention_matrix.shape[0]):
@@ -55,6 +56,23 @@ def heatmap(output_file: str, tagged_tokens: list[tag.TaggedToken], attention_ma
                     facecolor=color
                 ))
 
+    unnormalized_attention_mass, normalized_attention_mass = attention_features.calculate_attention_mass(attention_matrix, pairs)
+
+    ax.text(0.06, x - 0.03, title, fontsize=18, fontweight="bold", va="top", ha="left")
+    ax.text(
+        0.06, x - 0.12,
+        f"Unnormalized Feature Attention Mass: {unnormalized_attention_mass:.3f}\nSink Normalized Feature Attention Mass: {normalized_attention_mass:.3f}",
+        fontsize=18, va="top", ha="left"
+    )
+
+    ax.legend(handles=[
+        matplotlib.lines.Line2D([], [], color="none", label="X-Axis: Attending Token"),
+        matplotlib.lines.Line2D([], [], color="none", label="Y-Axis: Attended Token"),
+        patches.Patch(facecolor="red", label="Feature Attention"),
+        patches.Patch(facecolor="green", label="Non-Feature Attention"),
+        patches.Patch(facecolor="blue", label="Sink Attention"),
+    ], fontsize=18, loc="upper left", bbox_to_anchor=(0.05, x - 0.25), bbox_transform=ax.transData)
+
     fig.canvas.draw()
 
     current_fig_width = fig.get_figwidth()
@@ -70,50 +88,3 @@ def heatmap(output_file: str, tagged_tokens: list[tag.TaggedToken], attention_ma
     plt.savefig(f"{output_file}", dpi=100, bbox_inches="tight")
 
     plt.close()
-
-if __name__ == "__main__":
-    query_text = "query: are house cats the same species as lions?"
-    document_text = "document: Lions, or Panthera Leo of the Felidae family, are fearsome predators."
-
-    query_tokens = tag.generate_tagged_tokens(query_text, [
-        tag.tag_query,
-        tag.tag_pos,
-        tag.tag_embedding,
-        tag.tag_collection_stats
-    ], 0)
-
-    document_tokens = tag.generate_tagged_tokens(document_text, [
-        tag.tag_document,
-        tag.tag_pos,
-        tag.tag_embedding,
-        tag.tag_collection_stats
-    ], len(query_tokens))
-
-    all_tokens = query_tokens + document_tokens
-
-    focus_pairs = tag.filter_tagged_token_pairs(all_tokens, [
-        tag.filter_first(tag.token_satisfies_all([
-            tag.is_document,
-            tag.is_pos([ "NOUN", "PROPN" ])
-        ])),
-        tag.filter_second(tag.token_satisfies_all([
-            tag.is_query,
-            tag.is_pos([ "NOUN", "PROPN" ])
-        ])),
-        tag.filter_combination(tag.are_related)
-    ])
-
-    attention_layers = [ attention_layer.detach().cpu() for attention_layer in get_attention_layers(query_text, document_text) ]
-
-    heatmap("demo.png", all_tokens, attention_layers[8][0, 6, :, :], focus_pairs) # (11, 17), (11, 19), (11, 26), (8, 6), (16, 17)
-    
-    # for attention_layer_index, attention_layer in enumerate(attention_layers):
-    #     os.makedirs(f"results/example-heatmaps/layer{attention_layer_index}", exist_ok=True)
-
-    #     for attention_head_index in range(attention_layer.shape[1]):
-    #         attention_head = attention_layer[0, attention_head_index, :, :]
-
-    #         heatmap(f"results/example-heatmaps/layer{attention_layer_index}/head{attention_head_index}.png", all_tokens, attention_head, focus_pairs)
-
-    # prevent bus error caused by similarity model's internal destructor
-    os._exit(0)

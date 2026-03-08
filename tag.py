@@ -40,7 +40,7 @@ def tokenize(text: str, start_index: int):
     
     return [ TaggedToken(index + start_index, id, start, end, text[start : end]) for index, (id, (start, end)) in enumerate(zip(tokens["input_ids"], tokens["offset_mapping"])) ]
 
-pos_tagger = spacy.load("en_core_web_lg", disable=["parser", "ner", "lemmatizer"])
+pos_tagger = spacy.load("en_core_web_trf", disable=["parser", "ner", "lemmatizer"])
 
 def tag_pos(tagged_tokens: list[TaggedToken], text: str):
     word_list = pos_tagger(text)
