@@ -8,7 +8,7 @@ import math
 collection = ir_datasets.load("msmarco-passage/train")
 
 use_collection_subset = True
-subset_collection_size = 5000000
+subset_collection_size = 500000
 
 collection_doc_count = subset_collection_size if use_collection_subset else collection.docs_count()
 collection_word_count = 0
@@ -29,7 +29,7 @@ print("Starting Collection Statistics Calculation")
 word_tokenizer = spacy.blank("en")
 
 for doc in doc_iter:
-    doc_words = [ word.text.lower().strip() for word in word_tokenizer(doc.text) ]
+    doc_words = [ word.text.lower() for word in word_tokenizer(doc.text) ]
     doc_tokens = tokenizer(doc.text).input_ids
 
     word_doc_freq.update(set(doc_words))
