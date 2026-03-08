@@ -37,7 +37,10 @@ attention_feature_groups = {
             tag.filter_first(tag.is_pos([ "VERB", "AUX" ]))
         ]),
         AttentionFeature(attending="Adjective", filters=[
-            tag.filter_first(tag.is_pos([ "ADJ", "ADP", "ADV" ]))
+            tag.filter_first(tag.is_pos([ "ADJ" ]))
+        ]),
+        AttentionFeature(attending="Adverb", filters=[
+            tag.filter_first(tag.is_pos([ "ADV" ]))
         ])
     ],
     "attended_pos": [
@@ -49,7 +52,10 @@ attention_feature_groups = {
             tag.filter_second(tag.is_pos([ "VERB", "AUX" ]))
         ]),
         AttentionFeature(attended="Adjective", filters=[
-            tag.filter_second(tag.is_pos([ "ADJ", "ADP", "ADV" ]))
+            tag.filter_second(tag.is_pos([ "ADJ" ]))
+        ]),
+        AttentionFeature(attended="Adverb", filters=[
+            tag.filter_second(tag.is_pos([ "ADV" ]))
         ])
     ],
     "attending_rarity": [
@@ -90,8 +96,17 @@ attention_feature_groups = {
     ],
     "location": [
         AttentionFeature(),
+        AttentionFeature(attended="Adjacent", filters=[
+            tag.filter_combination(tag.are_adjacent)
+        ]),
         AttentionFeature(attended="Neighboring", filters=[
             tag.filter_combination(tag.are_neighbors)
+        ]),
+        AttentionFeature(attended="Same Word Group", filters=[
+            tag.filter_combination(tag.are_same_word_group)
+        ]),
+        AttentionFeature(attended="Different Word Group", filters=[
+            tag.filter_combination(tag.are_not(tag.are_same_word_group))
         ])
     ]
 }

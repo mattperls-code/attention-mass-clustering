@@ -7,14 +7,48 @@ import tag
 from heatmap import attention_heatmap, transformer_heatmap
 import attention_features
 
-num_rel_pairs = 2
-num_nrel_pairs = 1
+num_rel_pairs = 2500
+num_nrel_pairs = 500
 
 def plot_feature_attention_mass():
     features = [
         "Query Tokens Attending Query Tokens",
         "Document Tokens Attending Query Tokens",
-        "Document Tokens Attending Document Tokens"
+        "Document Tokens Attending Document Tokens",
+
+        "Rare Document Tokens Attending Word Identical Query Tokens",
+        "Rare Document Tokens Attending Synonymous Query Tokens",
+        "Rare Tokens Attending Different Word Group Word Identical Tokens",
+        "Rare Tokens Attending Different Word Group Synonymous Tokens",
+
+        "Rare Document Tokens Attending Rare Word Identical Query Tokens",
+        "Rare Document Tokens Attending Rare Synonymous Query Tokens",
+        "Rare Tokens Attending Rare Different Word Group Word Identical Tokens",
+        "Rare Tokens Attending Rare Different Word Group Synonymous Tokens",
+
+        "Very Rare Document Tokens Attending Very Rare Word Identical Query Tokens",
+        "Very Rare Document Tokens Attending Very Rare Synonymous Query Tokens",
+        "Very Rare Tokens Attending Very Rare Different Word Group Word Identical Tokens",
+        "Very Rare Tokens Attending Very Rare Different Word Group Synonymous Tokens",
+
+        "All Tokens Attending Common Tokens",
+        "Common Tokens Attending All Tokens",
+
+        "Noun Tokens Attending Neighboring Verb Tokens",
+        "Noun Tokens Attending Neighboring Adjective Tokens",
+        "Noun Tokens Attending Neighboring Adverb Tokens",
+
+        "Verb Tokens Attending Neighboring Noun Tokens",
+        "Verb Tokens Attending Neighboring Adjective Tokens",
+        "Verb Tokens Attending Neighboring Adverb Tokens",
+
+        "Adjective Tokens Attending Neighboring Noun Tokens",
+        "Adjective Tokens Attending Neighboring Verb Tokens",
+        "Adjective Tokens Attending Neighboring Adverb Tokens",
+
+        "Adverb Tokens Attending Neighboring Noun Tokens",
+        "Adverb Tokens Attending Neighboring Verb Tokens",
+        "Adverb Tokens Attending Neighboring Adjective Tokens",
     ]
 
     feature_attention_mass_table = {
