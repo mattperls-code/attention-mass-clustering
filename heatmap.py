@@ -3,10 +3,11 @@ import torch
 import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
+import matplotlib.colors as mcolors
 import tag
 import attention_features
 
-def heatmap(output_file: str, title: str, tagged_tokens: list[tag.TaggedToken], attention_matrix: torch.Tensor, pairs: set[tuple[int, int]]):
+def attention_heatmap(output_file: str, title: str, tagged_tokens: list[tag.TaggedToken], attention_matrix: torch.Tensor, pairs: set[tuple[int, int]]):
     scores = {}
 
     for i in range(attention_matrix.shape[0]):
@@ -87,4 +88,31 @@ def heatmap(output_file: str, title: str, tagged_tokens: list[tag.TaggedToken], 
 
     plt.savefig(f"{output_file}", dpi=100, bbox_inches="tight")
 
+    plt.close()
+
+def transformer_heatmap(output_file: str, title: str, attention_mass_table: list[list[float]]):
+    plt.clf()
+
+    num_attention_layers = len(attention_mass_table)
+    num_attention_heads = len(attention_mass_table[0])
+    
+    data = [[
+        attention_mass_table[attention_layer_index][attention_head_index]
+        for attention_layer_index in range(num_attention_layers)
+    ] for attention_head_index in range(num_attention_heads)]
+
+    black_to_red = mcolors.LinearSegmentedColormap.from_list("black_red", ["black", "red"])
+
+    fig, ax = plt.subplots(figsize=(num_attention_layers * 0.3, num_attention_heads * 0.3))
+    
+    ax.imshow(data, cmap=black_to_red, vmin=0.0, vmax=1.0, aspect="auto")
+
+    ax.set_title(title)
+    ax.set_xlabel("Attention Layer")
+    ax.set_ylabel("Attention Head")
+    ax.set_xticks(range(num_attention_layers))
+    ax.set_yticks(range(num_attention_heads))
+
+    plt.tight_layout()
+    plt.savefig(output_file)
     plt.close()

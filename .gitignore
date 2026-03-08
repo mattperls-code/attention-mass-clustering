@@ -3,4 +3,4 @@ __pycache__
 .DS_Store
 .env
 
-results/old-example-heatmaps
+results/old-attention-heatmaps
