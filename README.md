@@ -11,7 +11,3 @@ Grouping and visualizing attention heads based on normalized attention mass to f
 <img src="results/attention-heatmaps/1.png" width="600px" />
 
 <img src="results/attention-heatmaps/2.png" width="600px" />
-
-<img src="results/attention-heatmaps/3.png" width="600px" />
-
-<img src="results/attention-heatmaps/4.png" width="600px" />
