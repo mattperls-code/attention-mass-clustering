@@ -156,29 +156,30 @@ class CompositeFeatureTable:
 
     def get(self, key: str):
         return set.intersection(*[ self.filtered_feature_pairs[group_index][variant_index]["pairs"] for group_index, variant_index in self.composite_features[key] ])
-
-def calculate_attention_mass(attention_matrix: torch.Tensor, pairs: set[tuple[int, int]]):
-    raw_feature_attention_mass = 0
-    raw_total_attention_mass = 0
-
-    non_sink_feature_attention_mass = 0
-    non_sink_total_attention_mass = 0
-
-    for attended_index in range(0, attention_matrix.shape[1]):
-        for attending_index in range(attended_index, attention_matrix.shape[0]):
-            pair_mass = attention_matrix[attending_index, attended_index].item()
-
-            if (attending_index, attended_index) in pairs: raw_feature_attention_mass += pair_mass
-
-            raw_total_attention_mass += pair_mass 
-
-            if attended_index != 0:
-                if (attending_index, attended_index) in pairs: non_sink_feature_attention_mass += pair_mass
-
-                non_sink_total_attention_mass += pair_mass
-
-    unnormalized_attention_mass = raw_feature_attention_mass / raw_total_attention_mass
-
-    normalized_attention_mass = non_sink_feature_attention_mass / non_sink_total_attention_mass
     
-    return (unnormalized_attention_mass, normalized_attention_mass)
+    def get_mask(self, key: str, seq_len: int) -> torch.Tensor:
+        pairs = self.get(key)
+
+        mask = torch.zeros(seq_len, seq_len, dtype=torch.bool)
+
+        if pairs:
+            rows, cols = zip(*pairs)
+            mask[torch.tensor(rows), torch.tensor(cols)] = True
+
+        return mask
+        
+def calculate_attention_mass_batched(attention_stack: torch.Tensor, feature_mask: torch.Tensor):
+    seq_len = attention_stack.shape[-1]
+
+    lower_tri = torch.tril(torch.ones(seq_len, seq_len, dtype=torch.bool))
+    non_sink = lower_tri.clone()
+    non_sink[:, 0] = False
+
+    a = attention_stack * lower_tri
+
+    raw_total        = a.sum(dim=(-2, -1))
+    non_sink_total   = (a * non_sink).sum(dim=(-2, -1))
+    raw_feature      = (a * feature_mask).sum(dim=(-2, -1))
+    non_sink_feature = (a * feature_mask * non_sink).sum(dim=(-2, -1))
+
+    return raw_feature / raw_total, non_sink_feature / non_sink_total

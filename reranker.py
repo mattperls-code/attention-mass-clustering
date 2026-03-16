@@ -24,4 +24,4 @@ def get_attention_layers(query: str, document: str):
     with torch.no_grad():
         outputs = model(**tokens, output_attentions=True)
 
-        return [ attention_layer.detach().cpu() for attention_layer in outputs.attentions ]
+        return torch.stack(outputs.attentions)[:, 0]

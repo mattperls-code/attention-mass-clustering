@@ -72,7 +72,7 @@ def tag_stopword(tagged_tokens: list[TaggedToken], text: str):
 
 similarity_tokenizer = AutoTokenizer.from_pretrained("BAAI/bge-large-en-v1.5")
 similarity_model = AutoModel.from_pretrained("BAAI/bge-large-en-v1.5")
-similarity_model.to(reranker.device)
+# similarity_model.to(reranker.device)
 similarity_model.eval()
 
 # call after tagging pos to extract word
@@ -221,7 +221,7 @@ def are_synonyms(first_tagged_token: TaggedToken, second_tagged_token: TaggedTok
             first_tagged_token.other_tags["embedding"],
             second_tagged_token.other_tags["embedding"],
             dim=0
-        ).item() > 0.45
+        ).item() > 0.5
     )
 
 def are_mirror(first_tagged_token: TaggedToken, second_tagged_token: TaggedToken):
