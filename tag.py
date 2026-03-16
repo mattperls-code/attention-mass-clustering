@@ -2,8 +2,10 @@ from typing import Callable
 from collections import defaultdict
 import string
 import spacy
-from models import tokenizer
-from sentence_transformers import SentenceTransformer, util
+import reranker
+import torch
+from transformers import AutoTokenizer, AutoModel
+from nltk.corpus import stopwords
 import collection_statistics
 import math
 
@@ -33,10 +35,10 @@ class TaggedToken:
 
         tags = ", ".join([ categorical_tags_str, numerical_tags_str ])
 
-        return f"TaggedToken(index={self.index}, text=\"{self.text}\"" + (f", {tags}" if tags else "") + ")"
+        return f"{{ text=\"{self.text}\"" + (f", {tags}" if tags else "") + " }"
     
 def tokenize(text: str, start_index: int):
-    tokens = tokenizer(text, return_offsets_mapping=True)
+    tokens = reranker.tokenizer(text, return_offsets_mapping=True)
     
     return [ TaggedToken(index + start_index, id, start, end, text[start : end]) for index, (id, (start, end)) in enumerate(zip(tokens["input_ids"], tokens["offset_mapping"])) ]
 
@@ -48,9 +50,12 @@ def tag_pos(tagged_tokens: list[TaggedToken], text: str):
     for tagged_token in tagged_tokens:
         if tagged_token.start == tagged_token.end: continue
 
-        # llama tokens often includes space or punctuation, adjust accordingly so its not artificially outside the word bounds
-        tagged_token_start = tagged_token.start + (len(tagged_token.text) - len(tagged_token.text.lstrip(string.punctuation + string.whitespace)))
-        tagged_token_end = tagged_token.end - (len(tagged_token.text) - len(tagged_token.text.rstrip(string.punctuation + string.whitespace)))
+        # llama tokens often includes spaces, adjust accordingly so its not artificially outside the word bounds
+        tagged_token_start = tagged_token.start + (len(tagged_token.text) - len(tagged_token.text.lstrip(string.whitespace)))
+        tagged_token_end = tagged_token.end - (len(tagged_token.text) - len(tagged_token.text.rstrip(string.whitespace)))
+
+        tagged_token.numeric_tags["start_index"] = tagged_token_start
+        tagged_token.numeric_tags["end_index"] = tagged_token_end
 
         for word_index, word in enumerate(word_list):
             if tagged_token_start >= word.idx and tagged_token_end <= word.idx + len(word.text):
@@ -58,14 +63,31 @@ def tag_pos(tagged_tokens: list[TaggedToken], text: str):
                 tagged_token.categorical_tags["word"] = word.text
                 tagged_token.numeric_tags["word_index"] = word_index
 
-similarity_model = SentenceTransformer("all-MiniLM-L6-v2")
+stopword_set = set(stopwords.words("english"))
+
+# call after tagging pos to extract word
+def tag_stopword(tagged_tokens: list[TaggedToken], text: str):
+    for tagged_token in tagged_tokens:
+        tagged_token.other_tags["stopword"] = tagged_token.categorical_tags["word"].lower().strip() in stopword_set
+
+similarity_tokenizer = AutoTokenizer.from_pretrained("BAAI/bge-large-en-v1.5")
+similarity_model = AutoModel.from_pretrained("BAAI/bge-large-en-v1.5")
+similarity_model.to(reranker.device)
+similarity_model.eval()
 
 # call after tagging pos to extract word
 def tag_embedding(tagged_tokens: list[TaggedToken], text: str):
-    embeddings = similarity_model.encode([ tagged_token.categorical_tags["word"].lower().strip() for tagged_token in tagged_tokens ])
+    similarity_tokens = similarity_tokenizer(text, return_offsets_mapping=True, return_tensors='pt')
+    
+    with torch.no_grad():
+        similarity_model_output = similarity_model(**similarity_tokens, output_hidden_states=True)
 
-    for embedding_index in range(embeddings.shape[0]):
-        tagged_tokens[embedding_index].other_tags["embedding"] = embeddings[embedding_index, :]
+        averaged_contextual_embeddings = torch.stack(similarity_model_output.hidden_states[-8:-4]).mean(dim=0).squeeze(0)
+
+        for tagged_token in tagged_tokens:
+            for similarity_token_index, (similarity_token_start, similarity_token_end) in enumerate(similarity_tokens["offset_mapping"][0, :, :].tolist()):
+                if tagged_token.numeric_tags["start_index"] >= similarity_token_start and tagged_token.numeric_tags["end_index"] <= similarity_token_end:
+                    tagged_token.other_tags["embedding"] = averaged_contextual_embeddings[similarity_token_index, :]
 
 # call after tagging pos to extract word
 def tag_collection_stats(tagged_tokens: list[TaggedToken], text: str):
@@ -114,6 +136,9 @@ def is_pos(pos: set[str]):
         return tagged_token.categorical_tags["pos"] in pos
     
     return predicate
+
+def is_stopword(tagged_token: TaggedToken):
+    return tagged_token.other_tags["stopword"]
 
 def is_word_idf_range(idf: set[str]):
     def predicate(tagged_token: TaggedToken):
@@ -185,22 +210,19 @@ def are_exact_word_match(first_tagged_token: TaggedToken, second_tagged_token: T
     return first_tagged_token.categorical_tags["word"].lower().strip() == second_tagged_token.categorical_tags["word"].lower().strip()
 
 def are_synonyms(first_tagged_token: TaggedToken, second_tagged_token: TaggedToken):
-    return util.cos_sim(
-        first_tagged_token.other_tags["embedding"],
-        second_tagged_token.other_tags["embedding"]
-    ).item() > 0.7
-
-def are_related(first_tagged_token: TaggedToken, second_tagged_token: TaggedToken):
-    return util.cos_sim(
-        first_tagged_token.other_tags["embedding"],
-        second_tagged_token.other_tags["embedding"]
-    ).item() > 0.3
-
-def are_topical(first_tagged_token: TaggedToken, second_tagged_token: TaggedToken):
-    return util.cos_sim(
-        first_tagged_token.other_tags["embedding"],
-        second_tagged_token.other_tags["embedding"]
-    ).item() > 0.1
+    return (
+        not is_stopword(first_tagged_token) and
+        not is_stopword(second_tagged_token) and
+        first_tagged_token.categorical_tags["pos"] != "PUNCT" and
+        second_tagged_token.categorical_tags["pos"] != "PUNCT" and
+        "embedding" in first_tagged_token.other_tags and
+        "embedding" in second_tagged_token.other_tags and
+        torch.nn.functional.cosine_similarity(
+            first_tagged_token.other_tags["embedding"],
+            second_tagged_token.other_tags["embedding"],
+            dim=0
+        ).item() > 0.45
+    )
 
 def are_mirror(first_tagged_token: TaggedToken, second_tagged_token: TaggedToken):
     return first_tagged_token.index == second_tagged_token.index
@@ -255,3 +277,39 @@ def filter_tagged_token_pairs(tagged_tokens: list[TaggedToken], pair_filters: li
         pairs = pair_filter(tagged_tokens, pairs)
 
     return set(pairs)
+
+if __name__ == "__main__":
+    text = "There are very many ways to talk about vocabulary. It can be seen as an individual persons vernacular, as a mapping of terms to definitions, or, in the context of information retrieval, as the set of unique word strings across some corpus. Ultimately, how people talk and communicate is a complicated process, and trying to capture the nature of speech remains a barrier to textual modeling and natural language processing."
+
+    tagged_tokens = generate_tagged_tokens(text, [
+        tag_pos,
+        tag_stopword,
+        tag_embedding,
+        tag_collection_stats
+    ], 0)
+
+    print("Tokens:")
+
+    for tagged_token in tagged_tokens: print(f"{tagged_token}\n")
+
+    print()
+
+    rare_words = [ tagged_token.categorical_tags["word"] for tagged_token in tagged_tokens if is_word_idf_range([ "high" ])(tagged_token) ]
+
+    print("Rare Words")
+    print(rare_words)
+
+    very_rare_words = [ tagged_token.categorical_tags["word"] for tagged_token in tagged_tokens if is_word_idf_range([ "very high" ])(tagged_token) ]
+
+    print("Very Rare Words")
+    print(very_rare_words)
+
+    print()
+
+    synonymous_pairs = filter_tagged_token_pairs(tagged_tokens, [ filter_combination(are_synonyms) ])
+
+    print("Synonymous Words:")
+
+    for token_index1, token_index2 in synonymous_pairs:
+        if tagged_tokens[token_index1].numeric_tags["word_index"] != tagged_tokens[token_index2].numeric_tags["word_index"]:
+            print(f"{tagged_tokens[token_index1].categorical_tags["word"]} and {tagged_tokens[token_index2].categorical_tags["word"]}")

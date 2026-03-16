@@ -2,7 +2,7 @@ import ir_datasets
 from collections import Counter
 from itertools import islice
 import spacy
-from models import tokenizer
+import reranker
 import math
 
 collection = ir_datasets.load("msmarco-passage/train")
@@ -30,7 +30,7 @@ word_tokenizer = spacy.blank("en")
 
 for doc in doc_iter:
     doc_words = [ word.text.lower() for word in word_tokenizer(doc.text) ]
-    doc_tokens = tokenizer(doc.text).input_ids
+    doc_tokens = reranker.tokenizer(doc.text).input_ids
 
     word_doc_freq.update(set(doc_words))
     word_occurrences.update(doc_words)
@@ -45,10 +45,10 @@ print("Finished Collection Statistics Calculation")
 
 # rough bounds for idf and ido ranges
 
-very_low_idf = math.log(100 / 40) # 40-100%
-low_idf = math.log(100 / 15) # 15-40%
-med_idf = math.log(100 / 4) # 4-15%
-high_idf = math.log(100 / 0.5) # 0.5-4%, very high idf < 0.5%
+very_low_idf = math.log(1000 / 200) # 200 in every thousand docs
+low_idf = math.log(1000 / 100) # 100 in every thousand docs
+med_idf = math.log(1000 / 25) # 25 in every thousand docs
+high_idf = math.log(1000 / 2) # 2 in every thousand docs
 
 def idf_range(score: float):
     if score < very_low_idf: return "very low"
@@ -58,10 +58,10 @@ def idf_range(score: float):
     else: return "very high"
 
 # uses idf ranges, assuming 25 words per doc
-very_low_ido = math.log(50 / 1) # 1 in 50
-low_ido = math.log(100 / 1) # 1 in 100
-med_ido = math.log(250 / 1) # 1 in 250
-high_ido = math.log(2500 / 1) # 1 in 2500, very high ido < 1 in 2500
+very_low_ido = math.log(25 * 1000 / 200) # 200 in every 25 thousand words
+low_ido = math.log(25 * 1000 / 100) # 100 in every 25 thousand words
+med_ido = math.log(25 * 1000 / 25) # 25 in every 25 thousand words
+high_ido = math.log(25 * 1000 / 2) # 2 in every 25 thousand words
 
 def ido_range(score: float):
     if score < very_low_ido: return "very low"
