@@ -79,10 +79,10 @@ attention_feature_groups = {
         #     tag.filter_first(tag.is_word_idf_range([ "very low", "low" ]))
         # ]),
         AttentionFeature(attended="Rare", filters=[
-            tag.filter_first(tag.is_word_idf_range([ "high", "very high" ]))
+            tag.filter_second(tag.is_word_idf_range([ "high", "very high" ]))
         ]),
         AttentionFeature(attended="Very Rare", filters=[
-            tag.filter_first(tag.is_word_idf_range([ "very high" ]))
+            tag.filter_second(tag.is_word_idf_range([ "very high" ]))
         ])
     ],
     "similarity": [
@@ -94,25 +94,24 @@ attention_feature_groups = {
             tag.filter_combination(tag.are_synonyms)
         ])
     ],
-    "location": [
-        AttentionFeature(),
-        # AttentionFeature(attended="Adjacent", filters=[
-        #     tag.filter_combination(tag.are_adjacent)
-        # ]),
-        # AttentionFeature(attended="Neighboring", filters=[
-        #     tag.filter_combination(tag.are_neighbors)
-        # ]),
-        # AttentionFeature(attended="Same Word Group", filters=[
-        #     tag.filter_combination(tag.are_same_word_group)
-        # ]),
-        AttentionFeature(attended="Different Word Group", filters=[
-            tag.filter_combination(tag.are_not(tag.are_same_word_group))
-        ]),
-        # to track portion of sunk attention mass
-        AttentionFeature(attended="Non-Sink", filters=[
-            tag.filter_second(lambda tagged_token: tagged_token.index != 0)
-        ])
-    ]
+    # "location": [
+    #     AttentionFeature(),
+    #     AttentionFeature(attended="Adjacent", filters=[
+    #         tag.filter_combination(tag.are_adjacent)
+    #     ]),
+    #     AttentionFeature(attended="Neighboring", filters=[
+    #         tag.filter_combination(tag.are_neighbors)
+    #     ]),
+    #     AttentionFeature(attended="Same Word Group", filters=[
+    #         tag.filter_combination(tag.are_same_word_group)
+    #     ]),
+    #     AttentionFeature(attended="Different Word Group", filters=[
+    #         tag.filter_combination(tag.are_not(tag.are_same_word_group))
+    #     ]),
+    #     AttentionFeature(attended="Non-Sink", filters=[
+    #         tag.filter_second(lambda tagged_token: tagged_token.index != 0)
+    #     ])
+    # ]
 }
 
 feature_group_precedence = [ "attending_rarity", "attended_rarity", "location", "similarity", "attending_type", "attended_type" ]
