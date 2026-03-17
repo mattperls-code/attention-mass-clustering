@@ -5,6 +5,8 @@ import spacy
 import reranker
 import torch
 from transformers import AutoTokenizer, AutoModel
+import nltk
+nltk.download("stopwords")
 from nltk.corpus import stopwords
 import collection_statistics
 import math

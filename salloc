@@ -5,11 +5,10 @@ salloc \
   --mem=128G \
   --time=08:00:00
 
-
-
 salloc \
   --partition=gpu \
-  --gres=gpu:a100:1 \
+  --gres=gpu:1 \
+  --constraint="a100|v100-32g" \
   --ntasks=1 \
   --cpus-per-task=16 \
   --mem=128G \

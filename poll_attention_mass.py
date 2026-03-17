@@ -9,7 +9,7 @@ import tag
 from heatmap import transformer_heatmap
 import attention_features
 
-num_rel_pairs = 1
+num_rel_pairs = 1000
 num_nrel_pairs = 0
 
 total_pairs = num_rel_pairs + num_nrel_pairs
