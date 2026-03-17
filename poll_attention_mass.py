@@ -48,6 +48,8 @@ if __name__ == "__main__":
         query_text = "query: " + raw_query_text
         document_text = "document: " + documents_store.get(document_id).text
 
+        print(f"{query_text}\n{document_text}")
+
         attention_layers = reranker.get_attention_layers(query_text, document_text).cpu()
 
         tagged_query_tokens = tag.generate_tagged_tokens(query_text, [
@@ -78,7 +80,6 @@ if __name__ == "__main__":
             feature_attention_mass_table[feature]["unnormalized"] += unnorm
             feature_attention_mass_table[feature]["normalized"] += norm
 
-        print("Finished polling composite features")
         print(f"Processed pair {pair_index}/{len(query_document_pairs)}\n")
 
     for feature in features:

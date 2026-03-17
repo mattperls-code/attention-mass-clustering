@@ -114,7 +114,7 @@ attention_feature_groups = {
     # ]
 }
 
-feature_group_precedence = [ "attending_rarity", "attended_rarity", "location", "similarity", "attending_type", "attended_type" ]
+feature_group_precedence = [ "attending_rarity", "attended_rarity", "similarity", "attending_type", "attended_type" ]
 
 class CompositeFeatureTable:
     def __init__(self, tagged_tokens: list[tag.TaggedToken]):
