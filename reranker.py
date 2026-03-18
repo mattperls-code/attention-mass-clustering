@@ -9,11 +9,11 @@ tokenizer = AutoTokenizer.from_pretrained(tokenizer_name)
 base_model_name = "meta-llama/Llama-2-7b-hf"
 ft_model_name = "castorini/rankllama-v1-7b-lora-passage"
 
-base_model = AutoModelForSequenceClassification.from_pretrained(base_model_name, num_labels=1, attn_implementation="eager")
+base_model = AutoModelForSequenceClassification.from_pretrained(base_model_name, num_labels=1, attn_implementation="eager", torch_dtype=torch.float16)
 base_model.eval()
 
 ft_model = PeftModel.from_pretrained(
-    AutoModelForSequenceClassification.from_pretrained(base_model_name, num_labels=1, attn_implementation="eager"),
+    AutoModelForSequenceClassification.from_pretrained(base_model_name, num_labels=1, attn_implementation="eager", torch_dtype=torch.float16),
     ft_model_name
 ).merge_and_unload()
 ft_model.eval()
