@@ -114,4 +114,4 @@ def poll_attention_mass(model, tuning_name: str):
 
 if __name__ == "__main__":
     poll_attention_mass(reranker.base_model, "base-model")
-    # poll_attention_mass(reranker.ft_model, "ft-model")
+    poll_attention_mass(reranker.ft_model, "ft-model")

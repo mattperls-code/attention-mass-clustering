@@ -103,7 +103,8 @@ def transformer_heatmap(output_file: str, title: str, attention_mass_table: list
     cell_size = 0.25
     gap = 0.05
 
-    white_to_red = mcolors.LinearSegmentedColormap.from_list("black_red", ["white", "red"])
+    green_white_red = mcolors.LinearSegmentedColormap.from_list("black_red", ["green", "white", "red"])
+    norm = mcolors.TwoSlopeNorm(vmin=-1, vcenter=0, vmax=1)
 
     fig, ax = plt.subplots(figsize=(num_attention_layers * (cell_size + gap) - gap, num_attention_heads * (cell_size + gap) - gap))
     
@@ -113,7 +114,7 @@ def transformer_heatmap(output_file: str, title: str, attention_mass_table: list
                 (attention_layer_index * (cell_size + gap), attention_head_index * (cell_size + gap)),
                 cell_size,
                 cell_size,
-                color=white_to_red(attention_mass_table[attention_layer_index][attention_head_index])
+                color=green_white_red(norm(attention_mass_table[attention_layer_index][attention_head_index]))
             ))
 
     ax.set_title(title, pad=15)
