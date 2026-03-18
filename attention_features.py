@@ -156,9 +156,8 @@ class CompositeFeatureTable:
     def get(self, key: str):
         return set.intersection(*[ self.filtered_feature_pairs[group_index][variant_index]["pairs"] for group_index, variant_index in self.composite_features[key] ])
     
-    def get_mask(self, key: str, seq_len: int) -> torch.Tensor:
-        pairs = self.get(key)
-
+    staticmethod
+    def build_feature_mask(pairs: set[tuple[int, int]], seq_len: int):
         mask = torch.zeros(seq_len, seq_len, dtype=torch.bool)
 
         if pairs:
@@ -167,7 +166,7 @@ class CompositeFeatureTable:
 
         return mask
         
-def calculate_attention_mass_batched(attention_stack: torch.Tensor, feature_mask: torch.Tensor):
+def calculate_attention_mass(attention_stack: torch.Tensor, feature_mask: torch.Tensor):
     seq_len = attention_stack.shape[-1]
 
     lower_tri = torch.tril(torch.ones(seq_len, seq_len, dtype=torch.bool))

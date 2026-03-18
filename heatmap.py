@@ -58,7 +58,10 @@ def attention_heatmap(output_file: str, title: str, tagged_tokens: list[tag.Tagg
                     facecolor=color
                 ))
 
-    unnormalized_attention_mass, normalized_attention_mass = attention_features.calculate_attention_mass(attention_matrix, pairs)
+    unnormalized_attention_mass, normalized_attention_mass = attention_features.calculate_attention_mass(attention_matrix, attention_features.CompositeFeatureTable.build_feature_mask(
+        pairs,
+        attention_matrix.shape[-1]
+    ))
 
     ax.text(0.06, x - 0.03, title, fontsize=18, fontweight="bold", va="top", ha="left")
     ax.text(
@@ -137,36 +140,43 @@ def transformer_heatmap(output_file: str, title: str, attention_mass_table: list
 
     plt.close()
 
+def example_heatmap(model, tuning_name):
+    with reranker.using_device(model) as reranker_model:
+        query_text = "query: are house cats the same species as lions?"
+        document_text = "document: Lions, or Panthera Leo of the Felidae family, are fearsome predators."
+
+        tagged_query_tokens = tag.generate_tagged_tokens(query_text, [
+            tag.tag_query,
+            tag.tag_pos,
+            tag.tag_stopword,
+            tag.tag_embedding,
+            tag.tag_collection_stats
+        ], 0)
+
+        tagged_document_tokens = tag.generate_tagged_tokens(document_text, [
+            tag.tag_document,
+            tag.tag_pos,
+            tag.tag_stopword,
+            tag.tag_embedding,
+            tag.tag_collection_stats
+        ], len(tagged_query_tokens))
+
+        all_tagged_tokens = tagged_query_tokens + tagged_document_tokens
+
+        attention_layers = reranker.get_attention_layers(reranker_model, query_text, document_text)
+
+        seq_len = attention_layers.shape[-1]
+
+        composite_feature_table = attention_features.CompositeFeatureTable(all_tagged_tokens)
+
+        os.makedirs(f"./results/{tuning_name}/attention-heatmaps", exist_ok=True)
+
+        composite_feature1 = "Rare Tokens Attending Rare Synonymous Tokens"
+        attention_heatmap(f"results/{tuning_name}/attention-heatmaps/1.png", f"{composite_feature1} (Layer 8, Head 6)", all_tagged_tokens, attention_layers[8, 6, :, :], composite_feature_table.get(composite_feature1))
+
+        composite_feature2 = "Very Rare Document Tokens Attending Query Tokens"
+        attention_heatmap(f"results/{tuning_name}/attention-heatmaps/2.png", f"{composite_feature2} (Layer 16, Head 17)", all_tagged_tokens, attention_layers[16, 17, :, :], composite_feature_table.get(composite_feature2))
+
 if __name__ == "__main__":
-    query_text = "query: are house cats the same species as lions?"
-    document_text = "document: Lions, or Panthera Leo of the Felidae family, are fearsome predators."
-
-    tagged_query_tokens = tag.generate_tagged_tokens(query_text, [
-        tag.tag_query,
-        tag.tag_pos,
-        tag.tag_stopword,
-        tag.tag_embedding,
-        tag.tag_collection_stats
-    ], 0)
-
-    tagged_document_tokens = tag.generate_tagged_tokens(document_text, [
-        tag.tag_document,
-        tag.tag_pos,
-        tag.tag_stopword,
-        tag.tag_embedding,
-        tag.tag_collection_stats
-    ], len(tagged_query_tokens))
-
-    all_tagged_tokens = tagged_query_tokens + tagged_document_tokens
-
-    attention_layers = reranker.get_attention_layers(query_text, document_text)
-
-    composite_feature_table = attention_features.CompositeFeatureTable(all_tagged_tokens)
-
-    os.makedirs("./results/attention-heatmaps", exist_ok=True)
-
-    composite_feature1 = "Rare Tokens Attending Rare Synonymous Tokens"
-    attention_heatmap("results/attention-heatmaps/1.png", f"{composite_feature1} (Layer 8, Head 6)", all_tagged_tokens, attention_layers[8][0, 6, :, :], composite_feature_table.get(composite_feature1))
-
-    composite_feature2 = "Very Rare Document Tokens Attending Query Tokens"
-    attention_heatmap("results/attention-heatmaps/2.png", f"{composite_feature2} (Layer 16, Head 17)", all_tagged_tokens, attention_layers[16][0, 17, :, :], composite_feature_table.get(composite_feature2))
+    example_heatmap(reranker.base_model, "base-model")
+    example_heatmap(reranker.ft_model, "ft-model")
