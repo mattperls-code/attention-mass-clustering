@@ -4,7 +4,7 @@ Grouping and visualizing attention heads based on normalized attention mass to f
 
 ## Transformer Heatmaps
 
-<img src="results/transformer-heatmaps/Rare%20Tokens%20Attending%20Different%20Word%20Group%20Synonymous%20Tokens/normalized.png" width="600px" />
+<img src="results/transformer-heatmaps/Rare Document Tokens Attending Synonymous Query Tokens/normalized.png" width="600px" />
 
 ## Attention Heatmaps
 
