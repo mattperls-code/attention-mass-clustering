@@ -9,7 +9,7 @@ from tqdm import tqdm
 collection = ir_datasets.load("msmarco-passage/train")
 
 use_collection_subset = True
-subset_collection_size = 500000
+subset_collection_size = 1 # 500000
 BATCH_SIZE = 1024
 
 collection_doc_count = subset_collection_size if use_collection_subset else collection.docs_count()
