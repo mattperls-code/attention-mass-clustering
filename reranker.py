@@ -38,3 +38,9 @@ def get_attention_layers(model, query: str, document: str):
         outputs = model(**tokens, output_attentions=True)
 
         return torch.stack(outputs.attentions)[:, 0]
+    
+def use_model(model, query: str, document: str):
+    tokens = tokenizer(query, document, return_tensors="pt").to(device)
+    
+    with torch.no_grad():
+        return model(**tokens).logits.item()
