@@ -7,17 +7,16 @@ salloc \
 
 salloc \
   --partition=gpu \
-  --gres=gpu:1 \
-  --constraint="a100|v100-32g" \
+  --gres=gpu:a100:1 \
   --ntasks=1 \
-  --cpus-per-task=16 \
-  --mem=128G \
+  --cpus-per-task=4 \
+  --mem=32G \
   --time=08:00:00
 
 salloc \
   --partition=gpu \
-  --gres=gpu:a100:1 \
+  --gres=gpu:v100:1 \
   --ntasks=1 \
-  --cpus-per-task=16 \
+  --cpus-per-task=4 \
   --mem=32G \
-  --time=08:00:00
+  --time=8:00:00

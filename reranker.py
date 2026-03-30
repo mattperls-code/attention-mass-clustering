@@ -24,7 +24,8 @@ def using_device(model):
 
     if device.type == "cuda": torch.cuda.empty_cache()
 
-attn_implementation = ("flash_attention_2" if device == "cuda" else "sdpa") if Path(sys.modules["__main__"].__file__).name == "evaluate_model.py" else "eager"
+# attn_implementation = ("flash_attention_2" if device.type == "cuda" else "sdpa") if Path(sys.modules["__main__"].__file__).name == "evaluate_model.py" else "eager"
+attn_implementation = "sdpa" if Path(sys.modules["__main__"].__file__).name == "evaluate_model.py" else "eager"
 print(f"Using attn_implementation={attn_implementation}")
 
 base_model = AutoModelForSequenceClassification.from_pretrained(base_model_name, num_labels=1, attn_implementation=attn_implementation, dtype=torch.float16)
@@ -103,7 +104,8 @@ def use_model(model, query: str, documents: list[str]):
         documents,
         return_tensors="pt",
         padding=True,
-        truncation=True
+        truncation=True,
+        max_length=512
     ).to(device)
 
     model.config.pad_token_id = tokenizer.eos_token_id
