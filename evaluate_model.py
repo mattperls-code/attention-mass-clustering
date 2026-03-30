@@ -1,59 +1,52 @@
+import os
 from itertools import islice
 import random
+import json
 from collection_statistics import collection
 import reranker
 
-def mean_reciprocal_rank(rel_doc_rankings: list[int]):
-    return sum([
-        1 / rel_doc_ranking
-        for rel_doc_ranking in rel_doc_rankings
-    ]) / len(rel_doc_rankings)
+num_samples = 2
+nrel_docs_per_sample = 2
 
-# TODO
-def normalized_discount_cumulative_gain(rel_doc_rankings: list[int]):
-    return 0
-
-num_samples = 10
-nrel_docs_per_sample = 10
-
-def evaluate_model(model):
+def evaluate_model(model, output_path: str):
     documents_store = collection.docs_store()
     queries = { query.query_id: query.text for query in collection.queries_iter() }
 
     with reranker.using_device(model) as reranker_model:
-        rel_doc_rankings = []
+        logit_groups = []
 
         for qrel in islice(collection.qrels_iter(), num_samples):
-            print("building ranking list")
+            random.seed(qrel.query_id)
 
-            query = queries[qrel.query_id]
+            logits = reranker.use_model(
+                reranker_model,
+                queries[qrel.query_id],
+                [
+                    documents_store.get(qrel.doc_id).text,
+                    *[
+                        documents_store.get(str(random.randint(0, 1000000))).text
+                        for _ in range(nrel_docs_per_sample)
+                    ]
+                ]
+            )
 
-            rel_doc = qrel.doc_id
-            
-            scores = [(
-                rel_doc,
-                reranker.use_model(reranker_model, query, documents_store.get(rel_doc).text)
-            )]
+            logit_groups.append({
+                "rel": logits[0],
+                "nrel": logits[1:]
+            })
 
-            random.seed(rel_doc)
-
-            for _ in range(nrel_docs_per_sample):
-                nrel_doc = str(random.randint(0, 100000))
-
-                scores.append((
-                    nrel_doc,
-                    reranker.use_model(reranker_model, query, documents_store.get(nrel_doc).text)
-                ))
-
-            rel_doc_rankings.append(1 + [
-                doc == rel_doc
-                for doc, _ in sorted(scores, key = lambda doc_score: -doc_score[1])
-            ].index(True))
-
-        mrr = mean_reciprocal_rank(rel_doc_rankings)
-        ndcg = normalized_discount_cumulative_gain(rel_doc_rankings)
-
-        print(f"MRR: {mrr}, NDCG: {ndcg}")
+    with open(output_path, "w") as output_file:
+        json.dump(logit_groups, output_file, indent=4)
 
 if __name__ == "__main__":
-    evaluate_model(reranker.ft_model)
+    os.makedirs("results/ablation", exist_ok=True)
+
+    print("Evaluating unablated")
+    evaluate_model(reranker.ft_model, "results/ablation/none.json")
+
+    for layer_index in range(reranker.ft_model.config.num_hidden_layers):
+        for head_index in range(reranker.ft_model.config.num_attention_heads):
+            print(f"Ablating layer {layer_index}, head {head_index}")
+
+            with reranker.use_lora_ablated_model([ (layer_index, head_index) ]) as ablated_model:
+                evaluate_model(ablated_model, f"results/ablation/layer{layer_index}-head{head_index}.json")
