@@ -94,11 +94,11 @@ def attention_heatmap(output_file: str, title: str, tagged_tokens: list[tag.Tagg
 
     plt.close()
 
-def transformer_heatmap(output_file: str, title: str, attention_mass_table: list[list[float]]):
+def transformer_heatmap(output_file: str, title: str, head_data: list[list[float]]):
     plt.clf()
 
-    num_attention_layers = len(attention_mass_table)
-    num_attention_heads = len(attention_mass_table[0])
+    num_attention_layers = len(head_data)
+    num_attention_heads = len(head_data[0])
 
     cell_size = 0.25
     gap = 0.05
@@ -114,7 +114,7 @@ def transformer_heatmap(output_file: str, title: str, attention_mass_table: list
                 (attention_layer_index * (cell_size + gap), attention_head_index * (cell_size + gap)),
                 cell_size,
                 cell_size,
-                color=green_white_red(norm(attention_mass_table[attention_layer_index][attention_head_index]))
+                color=green_white_red(norm(head_data[attention_layer_index][attention_head_index]))
             ))
 
     ax.set_title(title, pad=15)
@@ -165,8 +165,6 @@ def example_heatmap(model, tuning_name):
         all_tagged_tokens = tagged_query_tokens + tagged_document_tokens
 
         attention_layers = reranker.get_attention_layers(reranker_model, query_text, document_text)
-
-        seq_len = attention_layers.shape[-1]
 
         composite_feature_table = attention_features.CompositeFeatureTable(all_tagged_tokens)
 

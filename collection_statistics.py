@@ -10,7 +10,13 @@ from tqdm import tqdm
 
 collection = ir_datasets.load("msmarco-passage/train")
 
-if Path(sys.modules['__main__'].__file__).name != "calculate_model_diffs.py" and Path(sys.modules['__main__'].__file__).name != "evaluate_model.py":
+if (
+    Path(sys.modules['__main__'].__file__).name not in [
+        "calculate_model_diffs.py",
+        "evaluate_model.py",
+        "analyze_ablations.py"
+    ]
+):
     
     use_collection_subset = True
     subset_collection_size = 500000
