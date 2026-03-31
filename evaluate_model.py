@@ -44,9 +44,29 @@ if __name__ == "__main__":
         print("Evaluating unablated")
         evaluate_model(reranker.ft_model, "results/ablation/none.json")
 
-        for layer_index in range(reranker.ft_model.config.num_hidden_layers):
-            for head_index in range(reranker.ft_model.config.num_attention_heads):
-                print(f"Ablating layer {layer_index}, head {head_index}")
+        # for layer_index in range(reranker.ft_model.config.num_hidden_layers):
+        #     for head_index in range(reranker.ft_model.config.num_attention_heads):
+        #         print(f"Ablating layer {layer_index}, head {head_index}")
 
-                with reranker.use_lora_ablated_model([ (layer_index, head_index) ]) as ablated_model:
-                    evaluate_model(ablated_model, f"results/ablation/layer{layer_index}-head{head_index}.json")
+        #         with reranker.use_lora_ablated_model([ (layer_index, head_index) ]) as ablated_model:
+        #             evaluate_model(ablated_model, f"results/ablation/layer{layer_index}-head{head_index}.json")
+
+        for layer_index in range(reranker.ft_model.config.num_hidden_layers):
+            print(f"Ablating layer {layer_index}")
+
+            with reranker.use_lora_ablated_model([
+                (layer_index, head_index)
+                for head_index in range(reranker.ft_model.config.num_attention_heads)
+            ]) as ablated_model:
+                evaluate_model(ablated_model, f"results/ablation/layer{layer_index}.json")
+
+        for layer_index in range(reranker.ft_model.config.num_hidden_layers):
+            print(f"Ablating layer {layer_index}")
+
+            with reranker.use_lora_ablated_model([
+                (other_layer_index, head_index)
+                for head_index in range(reranker.ft_model.config.num_attention_heads)
+                for other_layer_index in range(reranker.ft_model.config.num_hidden_layers)
+                if other_layer_index != layer_index
+            ]) as ablated_model:
+                evaluate_model(ablated_model, f"results/ablation/keep-layer{layer_index}.json")
