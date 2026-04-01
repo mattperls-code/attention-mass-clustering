@@ -4,6 +4,8 @@ import json
 import reranker
 from heatmap import transformer_heatmap
 from scipy.stats import spearmanr
+import matplotlib.pyplot as plt
+import random
 
 def mean_score_margin(rel_score: float, nrel_scores: list[float]):
     return -(rel_score - sum(nrel_scores) / len(nrel_scores))
@@ -17,27 +19,42 @@ def log_loss(rel_score: float, nrel_scores: list[float]):
 
     return -math.log(rel_score_exp / (rel_score_exp + sum(nrel_scores_exp)))
 
+def reciprocal_rank(rel_score: float, nrel_scores: list[float]):
+    all_scores = nrel_scores + [ rel_score ]
+    rank = sorted(all_scores, reverse=True).index(rel_score) + 1
+
+    return -1.0 / rank
+
+def ndcg(rel_score: float, nrel_scores: list[float]):
+    all_scores = nrel_scores + [ rel_score ]
+    
+    rank = sorted(all_scores, reverse=True).index(rel_score)
+
+    return -1.0 / math.log2(rank + 2)
+
+evaluation_metrics = {
+    "Mean Score Margin": mean_score_margin,
+    "Min Score Margin": min_score_margin,
+    "Log Loss": log_loss,
+    "Reciprocal Rank": reciprocal_rank,
+    "NDCG": ndcg
+}
+
 def analyze_ablation(ablation_data_path: str):
     with open(ablation_data_path, "r") as ablation_data_file:
         ablation_data = json.load(ablation_data_file)
 
-        mean_score_margins = []
-        min_score_margins = []
-        log_losses = []
+        evaluation_metric_scores = {}
 
-        for logits in ablation_data:
-            rel = logits["rel"]
-            nrel = logits["nrel"]
+        for evaluation_metric, calculate_metric in evaluation_metrics.items():
+            samples = []
 
-            mean_score_margins.append(mean_score_margin(rel, nrel))
-            min_score_margins.append(min_score_margin(rel, nrel))
-            log_losses.append(log_loss(rel, nrel))
+            for logits in ablation_data:
+                samples.append(calculate_metric(logits["rel"], logits["nrel"]))
 
-        avg_mean_score_margin = sum(mean_score_margins) / len(mean_score_margins)
-        avg_min_score_margin = sum(min_score_margins) / len(min_score_margins)
-        avg_log_loss = sum(log_losses) / len(log_losses)
+            evaluation_metric_scores[evaluation_metric] = sum(samples) / len(samples)
         
-        return avg_mean_score_margin, avg_min_score_margin, avg_log_loss
+        return evaluation_metric_scores
     
 def normalize_head_data(head_data: list[list[float]]):
     max_abs = max(abs(value) for layer in head_data for value in layer)
@@ -72,48 +89,73 @@ def top_model_correlations(model_data_name: str, head_data: list[list[float]], k
                 if not math.isnan(corr): corr_table[feature] = corr
 
     return sorted(corr_table.items(), key=lambda item: abs(item[1]), reverse=True)[:k]
-    
-def analyze_ablations():
-    avg_mean_score_margin_data = []
-    avg_min_score_margin_data = []
-    avg_log_loss_data = []
 
-    unablated_avg_mean_score_margin, unablated_avg_min_score_margin, unablated_avg_log_loss = analyze_ablation("results/ablation/none.json")
+def analyze_single_head_ablations():
+    evaluation_metric_control_values = analyze_ablation("results/ablation/none.json")
 
-    for layer_index in range(reranker.ft_model.config.num_hidden_layers):
-        avg_mean_score_margin_data.append([])
-        avg_min_score_margin_data.append([])
-        avg_log_loss_data.append([])
-
-        for head_index in range(reranker.ft_model.config.num_attention_heads):
-            ablated_avg_mean_score_margin, ablated_avg_min_score_margin, ablated_avg_log_loss = analyze_ablation(f"results/ablation/layer{layer_index}-head{head_index}.json")
-
-            avg_mean_score_margin_data[-1].append(ablated_avg_mean_score_margin - unablated_avg_mean_score_margin)
-            avg_min_score_margin_data[-1].append(ablated_avg_min_score_margin - unablated_avg_min_score_margin)
-            avg_log_loss_data[-1].append(ablated_avg_log_loss - unablated_avg_log_loss)
-
-    os.makedirs("results/ablation/analysis", exist_ok=True)
-
-    avg_mean_score_margin_data = normalize_head_data(avg_mean_score_margin_data)
-    avg_min_score_margin_data = normalize_head_data(avg_min_score_margin_data)
-    avg_log_loss_data = normalize_head_data(avg_log_loss_data)
-
-    transformer_heatmap("results/ablation/analysis/avg_mean_score_margin", "Average Mean Score Margin", avg_mean_score_margin_data)
-    transformer_heatmap("results/ablation/analysis/avg_min_score_margin", "Average Min Score Margin", avg_min_score_margin_data)
-    transformer_heatmap("results/ablation/analysis/avg_log_loss", "Average Log Loss", avg_log_loss_data)
-
-    model_data_names = [ "ft-model", "base-model" ]
-    performance_metrics = {
-        "avg_mean_score_margin": avg_mean_score_margin_data,
-        "avg_min_score_margin": avg_min_score_margin_data,
-        "avg_log_loss": avg_log_loss_data
+    evaluation_metric_heatmaps = {
+        evaluation_metric: []
+        for evaluation_metric in evaluation_metrics.keys()
     }
 
-    for model_data_name in model_data_names:
-        for performance_metric, metric_data in performance_metrics.items():
-            print()
-            print(f"Top corr between {model_data_name} and {performance_metric}")
-            print(top_model_correlations(model_data_name, metric_data, 5))
+    # my base model has control of LL = 0.5, my ablated model has LL = 0.8 cuz its worse, control - ablated = 0.5 - 0.8 = -0.3
+    # negative number means the ablated performs worse
+
+    for layer_index in range(reranker.ft_model.config.num_hidden_layers):
+        for evaluation_metric in evaluation_metrics.keys():
+            evaluation_metric_heatmaps[evaluation_metric].append([])
+
+        for head_index in range(reranker.ft_model.config.num_attention_heads):
+            evaluation_metric_scores = analyze_ablation(f"results/ablation/layer{layer_index}-head{head_index}.json")
+
+            for evaluation_metric, metric_score in evaluation_metric_scores.items():
+                evaluation_metric_heatmaps[evaluation_metric][-1].append(metric_score - evaluation_metric_control_values[evaluation_metric])
+
+    os.makedirs("results/ablation-analysis/head", exist_ok=True)
+
+    for evaluation_metric, metric_heatmap in evaluation_metric_heatmaps.items():
+        metric_heatmap = normalize_head_data(metric_heatmap)
+
+        transformer_heatmap(
+            f"results/ablation-analysis/head/{evaluation_metric}.png",
+            f"Increase in Average {evaluation_metric} Values\nWith Single Head Ablation",
+            normalize_head_data(metric_heatmap)
+        )
+
+        # model_data_names = [ "ft-model", "base-model" ]
+
+        # for model_data_name in model_data_names:
+        #     print(f"Top correlations between {model_data_name} and {evaluation_metric}")
+        #     print(top_model_correlations(model_data_name, metric_heatmap, 3))
+        #     print()
+
+def analyze_single_layer_ablations():
+    evaluation_metric_control_values = analyze_ablation("results/ablation/none.json")
+
+    evaluation_metric_progressions = {
+        evaluation_metric: []
+        for evaluation_metric in evaluation_metrics.keys()
+    }
+
+    for layer_index in range(reranker.ft_model.config.num_hidden_layers):
+        evaluation_metric_scores = analyze_ablation(f"results/ablation/layer{layer_index}.json")
+
+        for evaluation_metric, metric_score in evaluation_metric_scores.items():
+            evaluation_metric_progressions[evaluation_metric].append(metric_score - evaluation_metric_control_values[evaluation_metric])
+
+    os.makedirs("results/ablation-analysis/layer", exist_ok=True)
+
+    for evaluation_metric in evaluation_metrics.keys():
+        plt.clf()
+
+        plt.title(f"Increase in Average {evaluation_metric} Value\nWith Single Layer Ablation")
+        plt.xlabel("Layer Index")
+        plt.ylabel(f"Increase in Average {evaluation_metric}")
+
+        plt.plot(range(reranker.ft_model.config.num_hidden_layers), evaluation_metric_progressions[evaluation_metric])
+
+        plt.savefig(f"results/ablation-analysis/layer/{evaluation_metric}.png")
 
 if __name__ == "__main__":
-    analyze_ablations()
+    analyze_single_head_ablations()
+    analyze_single_layer_ablations()
