@@ -7,10 +7,7 @@ import reranker
 
 evaluation_collection = ir_datasets.load("msmarco-passage/dev")
 
-num_samples = 100
-nrel_docs_per_sample = 9
-
-def evaluate_model(reranker_model, output_path: str):
+def evaluate_model(reranker_model, num_samples: int, nrel_docs_per_sample: int, output_path: str):
     documents_store = evaluation_collection.docs_store()
     queries = { query.query_id: query.text for query in evaluation_collection.queries_iter() }
 
@@ -42,17 +39,14 @@ def evaluate_model(reranker_model, output_path: str):
 if __name__ == "__main__":
     os.makedirs("results/ablation", exist_ok=True)
 
+    num_samples = 100
+    nrel_docs_per_sample = 9
+
     with reranker.using_device(reranker.ft_model):
         print("Evaluating unablated")
         evaluate_model(reranker.ft_model, "results/ablation/none.json")
 
-        for layer_index in range(reranker.ft_model.config.num_hidden_layers):
-            for head_index in range(reranker.ft_model.config.num_attention_heads):
-                print(f"Ablating layer {layer_index}, head {head_index}")
-
-                with reranker.use_lora_ablated_model([ (layer_index, head_index) ]) as ablated_model:
-                    evaluate_model(ablated_model, f"results/ablation/layer{layer_index}-head{head_index}.json")
-
+        print("Evaluating Single Layer Ablations")
         for layer_index in range(reranker.ft_model.config.num_hidden_layers):
             print(f"Ablating layer {layer_index}")
 
@@ -60,10 +54,11 @@ if __name__ == "__main__":
                 (layer_index, head_index)
                 for head_index in range(reranker.ft_model.config.num_attention_heads)
             ]) as ablated_model:
-                evaluate_model(ablated_model, f"results/ablation/layer{layer_index}.json")
+                evaluate_model(ablated_model, num_samples, nrel_docs_per_sample, f"results/ablation/layer{layer_index}.json")
 
+        print("Evaluating Keep Single Layer Ablations")
         for layer_index in range(reranker.ft_model.config.num_hidden_layers):
-            print(f"Ablating layer {layer_index}")
+            print(f"Ablating all but layer {layer_index}")
 
             with reranker.use_lora_ablated_model([
                 (other_layer_index, head_index)
@@ -71,4 +66,38 @@ if __name__ == "__main__":
                 for other_layer_index in range(reranker.ft_model.config.num_hidden_layers)
                 if other_layer_index != layer_index
             ]) as ablated_model:
-                evaluate_model(ablated_model, f"results/ablation/keep-layer{layer_index}.json")
+                evaluate_model(ablated_model, num_samples, nrel_docs_per_sample, f"results/ablation/keep-layer{layer_index}.json")
+
+        layer_window_sizes = [ 2, 3, 4, 6 ]
+
+        for layer_window_size in layer_window_sizes:
+            print(f"Evaluating Layer Window Ablations of Size {layer_window_size}")
+            for layer_window_index in range(reranker.ft_model.config.num_hidden_layers - layer_window_size + 1):
+                print(f"Ablating layer window {layer_window_index}")
+
+                with reranker.use_lora_ablated_model([
+                    (layer_index, head_index)
+                    for head_index in range(reranker.ft_model.config.num_attention_heads)
+                    for layer_index in range(layer_window_index, layer_window_index + layer_window_size)
+                ]) as ablated_model:
+                    evaluate_model(ablated_model, num_samples, nrel_docs_per_sample, f"results/ablation/window{layer_window_index}-size{layer_window_size}.json")
+
+            print(f"Evaluating Keep Layer Window Ablations of Size {layer_window_size}")
+            for layer_window_index in range(reranker.ft_model.config.num_hidden_layers - layer_window_size + 1):
+                print(f"Ablating all but window {layer_window_index}")
+
+                with reranker.use_lora_ablated_model([
+                    (layer_index, head_index)
+                    for head_index in range(reranker.ft_model.config.num_attention_heads)
+                    for layer_index in range(reranker.ft_model.config.num_hidden_layers)
+                    if layer_index < layer_window_index or layer_index >= layer_window_index + layer_window_size
+                ]) as ablated_model:
+                    evaluate_model(ablated_model, num_samples, nrel_docs_per_sample, f"results/ablation/keep-window{layer_window_index}-size{layer_window_size}.json")
+                    
+        print("Evaluating Single Head Ablations")
+        for layer_index in range(reranker.ft_model.config.num_hidden_layers):
+            for head_index in range(reranker.ft_model.config.num_attention_heads):
+                print(f"Ablating layer {layer_index}, head {head_index}")
+
+                with reranker.use_lora_ablated_model([ (layer_index, head_index) ]) as ablated_model:
+                    evaluate_model(ablated_model, num_samples, nrel_docs_per_sample, f"results/ablation/layer{layer_index}-head{head_index}.json")
