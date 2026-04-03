@@ -44,7 +44,7 @@ if __name__ == "__main__":
 
     with reranker.using_device(reranker.ft_model):
         print("Evaluating unablated")
-        evaluate_model(reranker.ft_model, "results/ablation/none.json")
+        evaluate_model(reranker.ft_model, num_samples, nrel_docs_per_sample, "results/ablation/none.json")
 
         print("Evaluating Single Layer Ablations")
         for layer_index in range(reranker.ft_model.config.num_hidden_layers):
