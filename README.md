@@ -2,11 +2,19 @@
 
 Grouping and visualizing attention heads based on normalized attention mass to features.
 
-## Transformer Heatmaps
+## Attention Head Ablations
+
+<img src="results/ablation-analysis/head/Min Score Margin.png" width="600px" />
+
+## Attention Layer Window Ablations
+
+<img src="results/ablation-analysis/window/size4/Min Score Margin.png" width="600px" />
+
+## Feature Transformer Heatmaps
 
 <img src="results/ft-model/transformer-heatmaps/Rare Document Tokens Attending Synonymous Query Tokens/normalized.png" width="600px" />
 
-## Attention Heatmaps
+## Feature Attention Heatmaps
 
 <img src="results/ft-model/attention-heatmaps/1.png" width="600px" />
 

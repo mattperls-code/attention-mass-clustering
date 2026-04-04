@@ -13,7 +13,7 @@ def mean_score_margin(rel_score: float, nrel_scores: list[float]):
 def min_score_margin(rel_score: float, nrel_scores: list[float]):
     return -(rel_score - max(nrel_scores))
 
-def log_loss(rel_score: float, nrel_scores: list[float]):
+def categorical_cross_entropy(rel_score: float, nrel_scores: list[float]):
     rel_score_exp = math.exp(rel_score)
     nrel_scores_exp = [ math.exp(nrel_score) for nrel_score in nrel_scores ]
 
@@ -35,7 +35,7 @@ def ndcg(rel_score: float, nrel_scores: list[float]):
 evaluation_metrics = {
     "Mean Score Margin": mean_score_margin,
     "Min Score Margin": min_score_margin,
-    "Log Loss": log_loss,
+    "Categorical Cross Entropy": categorical_cross_entropy,
     "Reciprocal Rank": reciprocal_rank,
     "NDCG": ndcg
 }
@@ -98,9 +98,6 @@ def analyze_single_head_ablations():
         for evaluation_metric in evaluation_metrics.keys()
     }
 
-    # my base model has control of LL = 0.5, my ablated model has LL = 0.8 cuz its worse, control - ablated = 0.5 - 0.8 = -0.3
-    # negative number means the ablated performs worse
-
     for layer_index in range(reranker.ft_model.config.num_hidden_layers):
         for evaluation_metric in evaluation_metrics.keys():
             evaluation_metric_heatmaps[evaluation_metric].append([])
@@ -118,7 +115,7 @@ def analyze_single_head_ablations():
 
         transformer_heatmap(
             f"results/ablation-analysis/head/{evaluation_metric}.png",
-            f"Increase in Average {evaluation_metric} Values\nWith Single Head Ablation",
+            f"Average Increase in {evaluation_metric} Loss\nWith Single Head Ablation",
             normalize_head_data(metric_heatmap)
         )
 
@@ -128,6 +125,8 @@ def analyze_single_head_ablations():
         #     print(f"Top correlations between {model_data_name} and {evaluation_metric}")
         #     print(top_model_correlations(model_data_name, metric_heatmap, 3))
         #     print()
+
+# TODO: abstract the following analysis routines better
 
 def analyze_single_layer_ablations():
     evaluation_metric_control_values = analyze_ablation("results/ablation/none.json")
@@ -148,14 +147,108 @@ def analyze_single_layer_ablations():
     for evaluation_metric in evaluation_metrics.keys():
         plt.clf()
 
-        plt.title(f"Increase in Average {evaluation_metric} Value\nWith Single Layer Ablation")
+        plt.title(f"Average Increase in {evaluation_metric} Loss\nWith Single Layer Ablation")
         plt.xlabel("Layer Index")
-        plt.ylabel(f"Increase in Average {evaluation_metric}")
+        plt.ylabel(f"Average Increase in {evaluation_metric} Loss")
+        plt.axhline(y=0, color='black', linestyle='--')
 
         plt.plot(range(reranker.ft_model.config.num_hidden_layers), evaluation_metric_progressions[evaluation_metric])
 
         plt.savefig(f"results/ablation-analysis/layer/{evaluation_metric}.png")
 
+def analyze_keep_single_layer_ablations():
+    evaluation_metric_control_values = analyze_ablation("results/ablation/none.json")
+
+    evaluation_metric_progressions = {
+        evaluation_metric: []
+        for evaluation_metric in evaluation_metrics.keys()
+    }
+
+    for layer_index in range(reranker.ft_model.config.num_hidden_layers):
+        evaluation_metric_scores = analyze_ablation(f"results/ablation/keep-layer{layer_index}.json")
+
+        for evaluation_metric, metric_score in evaluation_metric_scores.items():
+            evaluation_metric_progressions[evaluation_metric].append(metric_score - evaluation_metric_control_values[evaluation_metric])
+
+    os.makedirs("results/ablation-analysis/keep-layer", exist_ok=True)
+
+    for evaluation_metric in evaluation_metrics.keys():
+        plt.clf()
+
+        plt.title(f"Average Increase in {evaluation_metric} Loss\nWith All But Single Layer Ablation")
+        plt.xlabel("Layer Index")
+        plt.ylabel(f"Average Increase in {evaluation_metric} Loss")
+        plt.axhline(y=0, color='black', linestyle='--')
+
+        plt.plot(range(reranker.ft_model.config.num_hidden_layers), evaluation_metric_progressions[evaluation_metric])
+
+        plt.savefig(f"results/ablation-analysis/keep-layer/{evaluation_metric}.png")
+
+def analyze_window_ablations():
+    evaluation_metric_control_values = analyze_ablation("results/ablation/none.json")
+
+    layer_window_sizes = [ 2, 3, 4, 6 ]
+    
+    for layer_window_size in layer_window_sizes:
+        evaluation_metric_progressions = {
+            evaluation_metric: []
+            for evaluation_metric in evaluation_metrics.keys()
+        }
+
+        for layer_window_index in range(reranker.ft_model.config.num_hidden_layers - layer_window_size + 1):
+            evaluation_metric_scores = analyze_ablation(f"results/ablation/window{layer_window_index}-size{layer_window_size}.json")
+
+            for evaluation_metric, metric_score in evaluation_metric_scores.items():
+                evaluation_metric_progressions[evaluation_metric].append(metric_score - evaluation_metric_control_values[evaluation_metric])
+
+        os.makedirs(f"results/ablation-analysis/window/size{layer_window_size}", exist_ok=True)
+
+        for evaluation_metric in evaluation_metrics.keys():
+            plt.clf()
+
+            plt.title(f"Average Increase in {evaluation_metric} Loss\nWith {layer_window_size} Layer Window Ablation")
+            plt.xlabel("Layer Index")
+            plt.ylabel(f"Average Increase in {evaluation_metric} Loss")
+            plt.axhline(y=0, color='black', linestyle='--')
+
+            plt.plot(range(reranker.ft_model.config.num_hidden_layers - layer_window_size + 1), evaluation_metric_progressions[evaluation_metric])
+
+            plt.savefig(f"results/ablation-analysis/window/size{layer_window_size}/{evaluation_metric}.png")
+
+def analyze_keep_window_ablations():
+    evaluation_metric_control_values = analyze_ablation("results/ablation/none.json")
+
+    layer_window_sizes = [ 2, 3, 4, 6 ]
+    
+    for layer_window_size in layer_window_sizes:
+        evaluation_metric_progressions = {
+            evaluation_metric: []
+            for evaluation_metric in evaluation_metrics.keys()
+        }
+
+        for layer_window_index in range(reranker.ft_model.config.num_hidden_layers - layer_window_size + 1):
+            evaluation_metric_scores = analyze_ablation(f"results/ablation/keep-window{layer_window_index}-size{layer_window_size}.json")
+
+            for evaluation_metric, metric_score in evaluation_metric_scores.items():
+                evaluation_metric_progressions[evaluation_metric].append(metric_score - evaluation_metric_control_values[evaluation_metric])
+
+        os.makedirs(f"results/ablation-analysis/keep-window/size{layer_window_size}", exist_ok=True)
+
+        for evaluation_metric in evaluation_metrics.keys():
+            plt.clf()
+
+            plt.title(f"Average Increase in {evaluation_metric} Loss\nWith All But {layer_window_size} Layer Window Ablation")
+            plt.xlabel("Layer Index")
+            plt.ylabel(f"Average Increase in {evaluation_metric} Loss")
+            plt.axhline(y=0, color='black', linestyle='--')
+
+            plt.plot(range(reranker.ft_model.config.num_hidden_layers - layer_window_size + 1), evaluation_metric_progressions[evaluation_metric])
+
+            plt.savefig(f"results/ablation-analysis/keep-window/size{layer_window_size}/{evaluation_metric}.png")
+
 if __name__ == "__main__":
-    analyze_single_head_ablations()
+    # analyze_single_head_ablations()
     analyze_single_layer_ablations()
+    analyze_keep_single_layer_ablations()
+    analyze_window_ablations()
+    analyze_keep_window_ablations()
