@@ -105,6 +105,9 @@ def analyze_single_layer_ablations():
     os.makedirs("results/ablation-analysis/layer", exist_ok=True)
 
     for evaluation_metric in evaluation_metrics.keys():
+        with open(f"results/ablation-analysis/layer/{evaluation_metric}.json", "w") as metric_progressions_file:
+            json.dump(evaluation_metric_progressions[evaluation_metric], metric_progressions_file)
+
         layer_trends.plot_layer_data(
             f"Average Increase in {evaluation_metric} Loss\nWith Single Layer Ablation",
             f"Average Increase in {evaluation_metric} Loss",
@@ -129,6 +132,9 @@ def analyze_keep_single_layer_ablations():
     os.makedirs("results/ablation-analysis/keep-layer", exist_ok=True)
 
     for evaluation_metric in evaluation_metrics.keys():
+        with open(f"results/ablation-analysis/keep-layer/{evaluation_metric}.json", "w") as metric_progressions_file:
+            json.dump(evaluation_metric_progressions[evaluation_metric], metric_progressions_file)
+
         layer_trends.plot_layer_data(
             f"Average Increase in {evaluation_metric} Loss\nWith All But Single Layer Ablation",
             f"Average Increase in {evaluation_metric} Loss",
@@ -156,6 +162,9 @@ def analyze_window_ablations():
         os.makedirs(f"results/ablation-analysis/window/size{layer_window_size}", exist_ok=True)
 
         for evaluation_metric in evaluation_metrics.keys():
+            with open(f"results/ablation-analysis/window/size{layer_window_size}/{evaluation_metric}.json", "w") as metric_progressions_file:
+                json.dump(evaluation_metric_progressions[evaluation_metric], metric_progressions_file)
+
             layer_trends.plot_layer_data(
                 f"Average Increase in {evaluation_metric} Loss\nWith {layer_window_size} Layer Window Ablation",
                 f"Average Increase in {evaluation_metric} Loss",
@@ -183,6 +192,9 @@ def analyze_keep_window_ablations():
         os.makedirs(f"results/ablation-analysis/keep-window/size{layer_window_size}", exist_ok=True)
 
         for evaluation_metric in evaluation_metrics.keys():
+            with open(f"results/ablation-analysis/keep-window/size{layer_window_size}/{evaluation_metric}.json", "w") as metric_progressions_file:
+                json.dump(evaluation_metric_progressions[evaluation_metric], metric_progressions_file)
+
             layer_trends.plot_layer_data(
                 f"Average Increase in {evaluation_metric} Loss\nWith All But {layer_window_size} Layer Window Ablation",
                 f"Average Increase in {evaluation_metric} Loss",
