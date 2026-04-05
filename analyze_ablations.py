@@ -3,9 +3,7 @@ import os
 import json
 import reranker
 from heatmap import transformer_heatmap
-from scipy.stats import spearmanr
-import matplotlib.pyplot as plt
-import random
+import layer_trends
 
 def mean_score_margin(rel_score: float, nrel_scores: list[float]):
     return -(rel_score - sum(nrel_scores) / len(nrel_scores))
@@ -61,35 +59,6 @@ def normalize_head_data(head_data: list[list[float]]):
 
     return [[ value / max_abs for value in layer ] for layer in head_data]
 
-def top_bottom_k(head_data: list[list[float]], k: int):
-    flat = [
-        (value, layer_index, head_index)
-        for layer_index, layer in enumerate(head_data)
-        for head_index, value in enumerate(layer)
-    ]
-    
-    sorted_flat = sorted(flat)
-    
-    return sorted_flat[:k], sorted_flat[-k:]
-
-def top_model_correlations(model_data_name: str, head_data: list[list[float]], k: int):
-    corr_table = {}
-
-    flattened_head_data = [ value for layer in head_data for value in layer ]
-
-    for feature in os.listdir(f"results/{model_data_name}/transformer-heatmaps"):
-        if os.path.exists(f"results/{model_data_name}/transformer-heatmaps/{feature}/normalized.json"):
-            with open(f"results/{model_data_name}/transformer-heatmaps/{feature}/normalized.json", "r") as feature_data_file:
-                feature_data = json.load(feature_data_file)
-
-                flattened_feature_data = [ value for layer in feature_data for value in layer ]
-
-                corr, _ = spearmanr(flattened_head_data, flattened_feature_data)
-
-                if not math.isnan(corr): corr_table[feature] = corr
-
-    return sorted(corr_table.items(), key=lambda item: abs(item[1]), reverse=True)[:k]
-
 def analyze_single_head_ablations():
     evaluation_metric_control_values = analyze_ablation("results/ablation/none.json")
 
@@ -111,20 +80,11 @@ def analyze_single_head_ablations():
     os.makedirs("results/ablation-analysis/head", exist_ok=True)
 
     for evaluation_metric, metric_heatmap in evaluation_metric_heatmaps.items():
-        metric_heatmap = normalize_head_data(metric_heatmap)
-
         transformer_heatmap(
             f"results/ablation-analysis/head/{evaluation_metric}.png",
             f"Average Increase in {evaluation_metric} Loss\nWith Single Head Ablation",
             normalize_head_data(metric_heatmap)
         )
-
-        # model_data_names = [ "ft-model", "base-model" ]
-
-        # for model_data_name in model_data_names:
-        #     print(f"Top correlations between {model_data_name} and {evaluation_metric}")
-        #     print(top_model_correlations(model_data_name, metric_heatmap, 3))
-        #     print()
 
 # TODO: abstract the following analysis routines better
 
@@ -145,16 +105,12 @@ def analyze_single_layer_ablations():
     os.makedirs("results/ablation-analysis/layer", exist_ok=True)
 
     for evaluation_metric in evaluation_metrics.keys():
-        plt.clf()
-
-        plt.title(f"Average Increase in {evaluation_metric} Loss\nWith Single Layer Ablation")
-        plt.xlabel("Layer Index")
-        plt.ylabel(f"Average Increase in {evaluation_metric} Loss")
-        plt.axhline(y=0, color='black', linestyle='--')
-
-        plt.plot(range(reranker.ft_model.config.num_hidden_layers), evaluation_metric_progressions[evaluation_metric])
-
-        plt.savefig(f"results/ablation-analysis/layer/{evaluation_metric}.png")
+        layer_trends.plot_layer_data(
+            f"Average Increase in {evaluation_metric} Loss\nWith Single Layer Ablation",
+            f"Average Increase in {evaluation_metric} Loss",
+            evaluation_metric_progressions[evaluation_metric],
+            f"results/ablation-analysis/layer/{evaluation_metric}.png"
+        )
 
 def analyze_keep_single_layer_ablations():
     evaluation_metric_control_values = analyze_ablation("results/ablation/none.json")
@@ -173,16 +129,12 @@ def analyze_keep_single_layer_ablations():
     os.makedirs("results/ablation-analysis/keep-layer", exist_ok=True)
 
     for evaluation_metric in evaluation_metrics.keys():
-        plt.clf()
-
-        plt.title(f"Average Increase in {evaluation_metric} Loss\nWith All But Single Layer Ablation")
-        plt.xlabel("Layer Index")
-        plt.ylabel(f"Average Increase in {evaluation_metric} Loss")
-        plt.axhline(y=0, color='black', linestyle='--')
-
-        plt.plot(range(reranker.ft_model.config.num_hidden_layers), evaluation_metric_progressions[evaluation_metric])
-
-        plt.savefig(f"results/ablation-analysis/keep-layer/{evaluation_metric}.png")
+        layer_trends.plot_layer_data(
+            f"Average Increase in {evaluation_metric} Loss\nWith All But Single Layer Ablation",
+            f"Average Increase in {evaluation_metric} Loss",
+            evaluation_metric_progressions[evaluation_metric],
+            f"results/ablation-analysis/keep-layer/{evaluation_metric}.png"
+        )
 
 def analyze_window_ablations():
     evaluation_metric_control_values = analyze_ablation("results/ablation/none.json")
@@ -204,16 +156,12 @@ def analyze_window_ablations():
         os.makedirs(f"results/ablation-analysis/window/size{layer_window_size}", exist_ok=True)
 
         for evaluation_metric in evaluation_metrics.keys():
-            plt.clf()
-
-            plt.title(f"Average Increase in {evaluation_metric} Loss\nWith {layer_window_size} Layer Window Ablation")
-            plt.xlabel("Layer Index")
-            plt.ylabel(f"Average Increase in {evaluation_metric} Loss")
-            plt.axhline(y=0, color='black', linestyle='--')
-
-            plt.plot(range(reranker.ft_model.config.num_hidden_layers - layer_window_size + 1), evaluation_metric_progressions[evaluation_metric])
-
-            plt.savefig(f"results/ablation-analysis/window/size{layer_window_size}/{evaluation_metric}.png")
+            layer_trends.plot_layer_data(
+                f"Average Increase in {evaluation_metric} Loss\nWith {layer_window_size} Layer Window Ablation",
+                f"Average Increase in {evaluation_metric} Loss",
+                evaluation_metric_progressions[evaluation_metric],
+                f"results/ablation-analysis/window/size{layer_window_size}/{evaluation_metric}.png"
+            )
 
 def analyze_keep_window_ablations():
     evaluation_metric_control_values = analyze_ablation("results/ablation/none.json")
@@ -235,19 +183,16 @@ def analyze_keep_window_ablations():
         os.makedirs(f"results/ablation-analysis/keep-window/size{layer_window_size}", exist_ok=True)
 
         for evaluation_metric in evaluation_metrics.keys():
-            plt.clf()
-
-            plt.title(f"Average Increase in {evaluation_metric} Loss\nWith All But {layer_window_size} Layer Window Ablation")
-            plt.xlabel("Layer Index")
-            plt.ylabel(f"Average Increase in {evaluation_metric} Loss")
-            plt.axhline(y=0, color='black', linestyle='--')
-
-            plt.plot(range(reranker.ft_model.config.num_hidden_layers - layer_window_size + 1), evaluation_metric_progressions[evaluation_metric])
-
-            plt.savefig(f"results/ablation-analysis/keep-window/size{layer_window_size}/{evaluation_metric}.png")
+            layer_trends.plot_layer_data(
+                f"Average Increase in {evaluation_metric} Loss\nWith All But {layer_window_size} Layer Window Ablation",
+                f"Average Increase in {evaluation_metric} Loss",
+                evaluation_metric_progressions[evaluation_metric],
+                f"results/ablation-analysis/keep-window/size{layer_window_size}/{evaluation_metric}.png"
+            )
 
 if __name__ == "__main__":
     # analyze_single_head_ablations()
+
     analyze_single_layer_ablations()
     analyze_keep_single_layer_ablations()
     analyze_window_ablations()
