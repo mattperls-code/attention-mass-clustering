@@ -37,6 +37,7 @@ ft_model = PeftModel.from_pretrained(
 ).merge_and_unload()
 ft_model.eval()
 
+# lora updates to the given heads are omitted
 @contextmanager
 def use_lora_ablated_model(heads: list[tuple[int, int]]):
     num_q_heads = ft_model.config.num_attention_heads
