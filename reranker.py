@@ -61,10 +61,10 @@ def use_lora_ablated_model(heads: list[tuple[int, int]]):
             base_attn = base_model.model.layers[layer_index].self_attn
 
             cache[(layer_index, head_index)] = {
-                "q_proj": ft_attn.q_proj.weight[q_start:q_end, :].clone(),
-                "k_proj": ft_attn.k_proj.weight[kv_start:kv_end, :].clone(),
-                "v_proj": ft_attn.v_proj.weight[kv_start:kv_end, :].clone(),
-                "o_proj": ft_attn.o_proj.weight[:, q_start:q_end].clone(),
+                "q_proj": ft_attn.q_proj.weight[q_start:q_end, :].cpu().clone(),
+                "k_proj": ft_attn.k_proj.weight[kv_start:kv_end, :].cpu().clone(),
+                "v_proj": ft_attn.v_proj.weight[kv_start:kv_end, :].cpu().clone(),
+                "o_proj": ft_attn.o_proj.weight[:, q_start:q_end].cpu().clone(),
             }
 
             ft_attn.q_proj.weight[q_start:q_end, :].copy_(base_attn.q_proj.weight[q_start:q_end, :])
