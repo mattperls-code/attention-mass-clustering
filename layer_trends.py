@@ -24,7 +24,7 @@ def apply_windowing(layer_data: list[float], window_size: int):
 
     return window_results
 
-def plot_layer_data(title: str, ylabel: str, data: list[float], output_path: str, layer_window_size: int = 1):
+def plot_layer_data(title: str, ylabel: str, data: list[float], output_path: str, window_size: int = 1):
     plt.clf()
 
     plt.figure(figsize=(10, 8))
@@ -36,10 +36,10 @@ def plot_layer_data(title: str, ylabel: str, data: list[float], output_path: str
 
     plt.plot(range(len(data)), data)
 
-    if layer_window_size > 1:
+    if window_size > 1:
         plt.xticks(
             ticks=range(len(data)),
-            labels=[f"{i + 1}-{i + layer_window_size}" for i in range(len(data))],
+            labels=[f"{i + 1}-{i + window_size}" for i in range(len(data))],
             rotation=45,
             ha="right"
         )
@@ -78,20 +78,20 @@ if __name__ == "__main__":
                     f"results/{model_data_path}/layers/{feature_name}/layer.png"
                 )
 
-                layer_window_sizes = [ 2, 3, 4, 6 ]
+                window_sizes = [ 2, 3, 4, 6 ]
 
-                for layer_window_size in layer_window_sizes:
-                    feature_window_data = apply_windowing(feature_layer_data, layer_window_size)
+                for window_size in window_sizes:
+                    feature_window_data = apply_windowing(feature_layer_data, window_size)
 
-                    with open(f"results/{model_data_path}/layers/{feature_name}/window-size{layer_window_size}.json", "w") as window_data_file:
+                    with open(f"results/{model_data_path}/layers/{feature_name}/window-size{window_size}.json", "w") as window_data_file:
                         json.dump(feature_window_data, window_data_file)
 
                     plot_layer_data(
-                        f"{feature_name}\n(Average Normalized Feature Attention Per {layer_window_size} Layer Window)",
+                        f"{feature_name}\n(Average Normalized Feature Attention Per {window_size} Layer Window)",
                         "Average Normalized Feature Attention Per Window",
                         feature_window_data,
-                        f"results/{model_data_path}/layers/{feature_name}/window-size{layer_window_size}.png",
-                        layer_window_size=layer_window_size
+                        f"results/{model_data_path}/layers/{feature_name}/window-size{window_size}.png",
+                        window_size=window_size
                     )
 
     data_file_paths = [
@@ -106,7 +106,7 @@ if __name__ == "__main__":
         if os.path.isdir(f"results/ft-model/layers/{feature_name}"):
             os.makedirs(f"results/model-diffs/layers/{feature_name}", exist_ok=True)
 
-            for (data_file_path, grouping_name, layer_window_size) in data_file_paths:
+            for (data_file_path, grouping_name, window_size) in data_file_paths:
                 with open(f"results/base-model/layers/{feature_name}/{data_file_path}.json", "r") as base_model_data_file:
                     with open(f"results/ft-model/layers/{feature_name}/{data_file_path}.json", "r") as ft_model_data_file:
                         base_model_data = json.load(base_model_data_file)
@@ -125,5 +125,5 @@ if __name__ == "__main__":
                             f"Normalized Feature Attention Difference Per {grouping_name}",
                             model_diffs_data,
                             f"results/model-diffs/layers/{feature_name}/{data_file_path}.png",
-                            layer_window_size=layer_window_size
+                            window_size=window_size
                         )
