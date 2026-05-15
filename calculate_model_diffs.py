@@ -28,19 +28,24 @@ def calculate_model_diffs():
                 ]
 
                 heatmap.transformer_heatmap(
-                    f"results/base-model/transformer-heatmaps/{mutual_heatmap}.png",
+                    f"results/base-model/transformer-heatmaps/{mutual_heatmap}/heatmap.png",
                     f"{mutual_heatmap}\n(Normalized Feature Attention in Base Model)",
                     base_model_heatmap_data
                 )
 
                 heatmap.transformer_heatmap(
-                    f"results/ft-model/transformer-heatmaps/{mutual_heatmap}.png",
+                    f"results/ft-model/transformer-heatmaps/{mutual_heatmap}/heatmap.png",
                     f"{mutual_heatmap}\n(Normalized Feature Attention in Fine-Tuned Model)",
                     ft_model_heatmap_data
                 )
 
+                os.makedirs(f"results/model-diffs/transformer-heatmaps/{mutual_heatmap}", exist_ok=True)
+
+                with open(f"results/model-diffs/transformer-heatmaps/{mutual_heatmap}/normalized.json", "w") as model_diff_data_file:
+                    json.dump(model_diff_heatmap_data, model_diff_data_file)
+
                 heatmap.transformer_heatmap(
-                    f"results/model-diffs/transformer-heatmaps/{mutual_heatmap}.png",
+                    f"results/model-diffs/transformer-heatmaps/{mutual_heatmap}/heatmap.png",
                     f"{mutual_heatmap}\n(Difference Between Normalized Feature Attention in Fine Tuned vs. Base Model)",
                     model_diff_heatmap_data
                 )
